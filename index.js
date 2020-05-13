@@ -3,6 +3,27 @@
 const net = require('net');
 const util = require('util');
 
+const mesErrConfig = `
+log4js.configure({
+    appenders: {
+        logstash: {
+            type: 'km-log4js-logstash-tcp',
+            host: 'localhost',
+            port: 5000,
+            service: {
+                name: 'server_a',
+                ip: '1.1.2.3',
+                environment: process.env.NODE_ENV || 'development'
+            }
+        },
+        console: { type: 'console' }
+    },
+    categories: {
+        default: { appenders: ['logstash', 'console'], level: 'info' }
+    }
+});
+`
+
 function sendLog(host, port, logObject) {
     const msg = JSON.stringify(logObject) + "\n";
     const tcp = net.connect({ host: host, port: port }, function () {
@@ -25,6 +46,10 @@ function logstashTCP(config, layout) {
     if (!config.fields) {
         config.fields = {};
     }
+    if (!config.service) {
+        console.log('pls set config service like : ', mesErrConfig);
+        config.service = {};
+    }
 
     function checkArgs(argsValue, logUnderFields) {
         if ((!argsValue) || (argsValue === 'both')) {
@@ -44,7 +69,7 @@ function logstashTCP(config, layout) {
 
     function log(loggingEvent) {
         const fields = {};
-        console.log('config.fields = ', config.fields);
+        // console.log('config.fields = ', config.fields);
         Object.keys(config.fields).forEach((key) => {
             fields[key] = typeof config.fields[key] === 'function' ? config.fields[key](loggingEvent) : config.fields[key];
         });
@@ -59,6 +84,7 @@ function logstashTCP(config, layout) {
         //         ;
         //     }
         // }
+
         fields.level = loggingEvent.level.levelStr;
         fields.category = loggingEvent.categoryName;
         console.log('log4js - loggingEvent = ', loggingEvent);
@@ -82,10 +108,8 @@ function logstashTCP(config, layout) {
             if ((secondEvData !== undefined) && (secondEvData !== null)) {
                 let extra_data = {}
                 Object.keys(secondEvData).forEach((key) => {
-                    // fields[key] = ;
                     try {
                         if(typeof secondEvData[key] === 'object'){
-                            console.log('=== object');
                             extra_data[key] = JSON.stringify(secondEvData[key])
                         }else{
                             extra_data[key] = String(secondEvData[key])
